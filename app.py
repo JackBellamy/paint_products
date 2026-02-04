@@ -202,14 +202,9 @@ else:
                 
                 st.success(f"Found {len(filtered_results)} product(s) in {catalog_filter}")
                 
-                # Display single table with column configuration
-                st.dataframe(
-                    filtered_results[['Code', 'Product', 'Price', 'Catalog']],
-                    use_container_width=True,
-                    hide_index=True,
-                    column_config={
-                        "Code": st.column_config.TextColumn(width="small")
-                    }
+                # Display single table
+                st.table(
+                    filtered_results[['Code', 'Product', 'Price', 'Catalog']]
                 )
             else:
                 st.warning(f"No products found matching '{search_query}'. Try different keywords.")
