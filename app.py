@@ -7,6 +7,7 @@ import streamlit as st
 import pandas as pd
 import os
 from pathlib import Path
+from fuzzywuzzy import fuzz
 
 # Page configuration
 st.set_page_config(
@@ -133,16 +134,25 @@ if not catalogs:
     st.error("No paint catalogs found. Please ensure Excel files are in data/paint/ directory.")
 else:
     # Create search interface
-    col1, col2 = st.columns([3, 1])
+    col1, col2, col3 = st.columns([2.5, 1.2, 0.8])
     
     with col1:
         search_query = st.text_input(
             "🔍 Search for paint products",
             placeholder="Enter product name, color, or description...",
-            help="Search across all catalogs"
+            help="Search for products"
         )
     
     with col2:
+
+        catalog_filter = st.selectbox(
+            "Filter by Catalog:",
+            ["All", "Akzo", "Crown", "PPG"],
+            key="search_catalog_filter"
+        )
+    
+    with col3:
+        st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
         search_button = st.button("Search", type="primary", use_container_width=True)
     
     st.divider()
@@ -154,15 +164,29 @@ else:
         if not query_lower:
             st.info("Enter a search term to find products")
         else:
-            # Search across all catalogs
+            # Search across all catalogs using fuzzy matching
             results = []
             
+            # Split search query into individual words
+            search_terms = query_lower.split()
+            
             for catalog_name, catalog_data in catalogs.items():
-                df = catalog_data['data']
-                # Search in both Code and Product columns (case-insensitive)
-                mask = (df['Code'].astype(str).str.lower().str.contains(query_lower, na=False)) | \
-                       (df['Product'].str.lower().str.contains(query_lower, na=False))
-                matching = df[mask].copy()
+                df = catalog_data['data'].copy()
+                # Use fuzzy matching for both Code and Product columns
+                # Calculate match scores for each row - all terms must match
+                df['match_score'] = df.apply(
+                    lambda row: min(
+                        max(
+                            fuzz.token_set_ratio(term, str(row['Code']).lower()),
+                            fuzz.token_set_ratio(term, row['Product'].lower())
+                        )
+                        for term in search_terms
+                    ) if search_terms else 0,
+                    axis=1
+                )
+                # Keep matches with score >= 50 (50% similarity on ALL terms)
+                matching = df[df['match_score'] >= 50].copy()
+                matching = matching.drop('match_score', axis=1)
                 results.append(matching)
             
             # Combine results
@@ -170,20 +194,13 @@ else:
             
             # Display results
             if len(all_results) > 0:
-                st.success(f"Found {len(all_results)} product(s)")
-                
-                # Add catalog filter dropdown
-                catalog_filter = st.selectbox(
-                    "Filter by Catalog:",
-                    ["All", "Akzo", "Crown", "PPG"],
-                    key="search_catalog_filter"
-                )
-                
                 # Filter results based on selection
                 if catalog_filter == "All":
                     filtered_results = all_results
                 else:
                     filtered_results = all_results[all_results['Catalog'] == catalog_filter]
+                
+                st.success(f"Found {len(filtered_results)} product(s) in {catalog_filter}")
                 
                 # Display single table with column configuration
                 st.dataframe(
@@ -191,8 +208,7 @@ else:
                     use_container_width=True,
                     hide_index=True,
                     column_config={
-                        "Code": st.column_config.TextColumn(width="small"),
-                        "Price": st.column_config.TextColumn(width="small")
+                        "Code": st.column_config.TextColumn(width="small")
                     }
                 )
             else:
