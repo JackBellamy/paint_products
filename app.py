@@ -202,9 +202,9 @@ else:
                 
                 st.success(f"Found {len(filtered_results)} product(s) in {catalog_filter}")
                 
-                # Display single table
-                st.table(
-                    filtered_results[['Code', 'Product', 'Price', 'Catalog']]
-                )
+                # Display single table - ensure Code is string to keep left alignment
+                display_results = filtered_results[['Code', 'Product', 'Price', 'Catalog']].copy()
+                display_results['Code'] = display_results['Code'].astype(str)
+                st.table(display_results)
             else:
                 st.warning(f"No products found matching '{search_query}'. Try different keywords.")
